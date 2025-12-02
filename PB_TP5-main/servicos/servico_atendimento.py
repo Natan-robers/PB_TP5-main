@@ -5,6 +5,7 @@ from dados.repositorio_compra import criar_compra, adicionar_item_compra
 from visualizacoes.interface_console import solicitar_id_cliente, solicitar_id_produto_e_quantidade, exibir_nota_fiscal
 
 def processar_atendimento_loop():
+    estoque_temp = {}
     while True:
         try:
             abrir = input("Deseja iniciar um atendimento? [s/n]: ").strip().lower()
@@ -31,7 +32,7 @@ def processar_atendimento_loop():
             carrinho = []
             while True:
                 try:
-                    item = solicitar_id_produto_e_quantidade()
+                    item = solicitar_id_produto_e_quantidade(estoque_temp)
                     if item is None:
                         break
                     carrinho.append(item)

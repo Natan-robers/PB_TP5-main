@@ -10,6 +10,8 @@ from dados.modelos import Produto
 from dados.conexao import obter_sessao
 from dados.modelos import Item
 from sqlalchemy import func
+from tabulate import tabulate
+
 
 def menu_produtos():
     while True:
@@ -47,24 +49,26 @@ def menu_produtos():
         except Exception as e:
             print(f"\nErro: {e}")
 
+
 def listar_produtos():
     produtos = listar_todos_produtos()
     
     if not produtos:
         print("\nNenhum produto cadastrado.")
         return
-    
-    print("\n" + "=" * 80)
-    print("LISTA DE PRODUTOS")
-    print("=" * 80)
-    print(f"{'ID':<5} {'Nome':<40} {'Qtd':<10} {'Preço':<15}")
-    print("-" * 80)
-    
-    for produto in produtos:
-        print(f"{produto.id:<5} {produto.nome:<40} {produto.quantidade:<10} R$ {produto.preco:>10.2f}")
-    
-    print("=" * 80)
-    print(f"Total: {len(produtos)} produto(s)")
+
+    tabela = [[p.id, p.nome, p.quantidade, f"R$ {p.preco:.2f}"] for p in produtos]
+
+    print("\nLISTA DE PRODUTOS\n")
+    print(tabulate(
+        tabela,
+        headers=["ID", "Nome", "Quantidade", "Preço"],
+        tablefmt="fancy_grid",
+        stralign="left",
+        numalign="right"
+    ))
+    print(f"\nTotal: {len(produtos)} produto(s)")
+
 
 def cadastrar_produto():
     try:
@@ -90,13 +94,13 @@ def cadastrar_produto():
         salvar_ou_atualizar_produto(produto)
         
         print(f"\nProduto {id_produto} cadastrado com sucesso!")
-        
         associar_fornecedores_produto(id_produto)
         
     except ValueError:
         print("Valor inválido. Digite números.")
     except Exception as e:
         print(f"Erro ao cadastrar: {e}")
+
 
 def alterar_produto():
     try:
@@ -134,6 +138,7 @@ def alterar_produto():
     except Exception as e:
         print(f"Erro ao alterar: {e}")
 
+
 def excluir_produto():
     try:
         id_produto = int(input("\nDigite o ID do produto a excluir: ").strip())
@@ -164,6 +169,7 @@ def excluir_produto():
     except Exception as e:
         print(f"Erro ao excluir produto: {e}")
 
+
 def associar_fornecedores_produto(id_produto):
     try:
         resposta = input("\nDeseja associar fornecedores a este produto? [s/n]: ").strip().lower()
@@ -175,15 +181,14 @@ def associar_fornecedores_produto(id_produto):
             print("Nenhum fornecedor cadastrado.")
             return
         
-        print("\nFornecedores disponíveis:")
-        for f in fornecedores:
-            print(f"  {f.id}. {f.nome}")
-        
+        tabela = [[f.id, f.nome] for f in fornecedores]
+        print("\nFornecedores disponíveis:\n")
+        print(tabulate(tabela, headers=["ID", "Nome"], tablefmt="fancy_grid"))
+
         while True:
             id_fornecedor = input("\nDigite o ID do fornecedor (ou 0 para sair): ").strip()
             if id_fornecedor == '0':
                 break
-            
             try:
                 id_fornecedor = int(id_fornecedor)
                 associar_produto_fornecedor(id_produto, id_fornecedor)
@@ -193,43 +198,38 @@ def associar_fornecedores_produto(id_produto):
     except Exception as e:
         print(f"Erro: {e}")
 
+
 def gerenciar_fornecedores_produto(id_produto):
     try:
         fornecedores = obter_fornecedores_produto(id_produto)
-        
         print("\nFornecedores atuais deste produto:")
         if fornecedores:
-            for f in fornecedores:
-                print(f"  {f.id}. {f.nome}")
+            tabela = [[f.id, f.nome] for f in fornecedores]
+            print(tabulate(tabela, headers=["ID", "Nome"], tablefmt="fancy_grid"))
         else:
-            print("  Nenhum fornecedor associado.")
+            print("Nenhum fornecedor associado.")
         
         print("\n1. Adicionar fornecedor")
         print("2. Remover fornecedor")
         print("0. Voltar")
         
         opcao = input("Escolha uma opção: ").strip()
-        
         if opcao == '1':
             fornecedores_disponiveis = listar_todos_fornecedores()
-            print("\nFornecedores disponíveis:")
-            for f in fornecedores_disponiveis:
-                if f not in fornecedores:
-                    print(f"  {f.id}. {f.nome}")
-            
+            tabela = [[f.id, f.nome] for f in fornecedores_disponiveis if f not in fornecedores]
+            print(tabulate(tabela, headers=["ID", "Nome"], tablefmt="fancy_grid"))
             id_fornecedor = int(input("Digite o ID do fornecedor: ").strip())
             associar_produto_fornecedor(id_produto, id_fornecedor)
             print("Fornecedor adicionado!")
-            
         elif opcao == '2':
             id_fornecedor = int(input("Digite o ID do fornecedor a remover: ").strip())
             remover_associacao_produto_fornecedor(id_produto, id_fornecedor)
             print("Fornecedor removido!")
-            
     except ValueError:
         print("ID inválido.")
     except Exception as e:
         print(f"Erro: {e}")
+
 
 def menu_consultas_produtos():
     while True:
@@ -264,110 +264,85 @@ def menu_consultas_produtos():
         except Exception as e:
             print(f"\nErro: {e}")
 
+
 def produtos_mais_vendidos():
     session = obter_sessao()
-    
     resultado = session.query(
-        Produto.id,
-        Produto.nome,
-        func.sum(Item.quantidade).label('total_vendido')
-    ).select_from(Produto).join(Item, Produto.id == Item.id_produto).group_by(Produto.id, Produto.nome).order_by(func.sum(Item.quantidade).desc()).limit(10).all()
-    
+        Produto.id, Produto.nome, func.sum(Item.quantidade).label('total_vendido')
+    ).select_from(Produto).join(Item, Produto.id == Item.id_produto)\
+     .group_by(Produto.id, Produto.nome)\
+     .order_by(func.sum(Item.quantidade).desc())\
+     .limit(10).all()
+
     if not resultado:
         print("\nNenhum produto vendido encontrado.")
         return
-    
-    print("\n" + "=" * 70)
-    print("PRODUTOS MAIS VENDIDOS (Top 10)")
-    print("=" * 70)
-    print(f"{'ID':<5} {'Nome':<40} {'Total Vendido':<20}")
-    print("-" * 70)
-    
-    for produto_id, nome, total_vendido in resultado:
-        print(f"{produto_id:<5} {nome:<40} {total_vendido:<20}")
-    
-    print("=" * 70)
+
+    tabela = [[pid, nome, total] for pid, nome, total in resultado]
+    print("\nTOP 10 – PRODUTOS MAIS VENDIDOS\n")
+    print(tabulate(tabela, headers=["ID", "Produto", "Total Vendido"], tablefmt="grid", stralign="left", numalign="right"))
+
 
 def produtos_menos_vendidos():
     session = obter_sessao()
-    
     resultado = session.query(
-        Produto.id,
-        Produto.nome,
-        func.sum(Item.quantidade).label('total_vendido')
-    ).select_from(Produto).join(Item, Produto.id == Item.id_produto).group_by(Produto.id, Produto.nome).order_by(func.sum(Item.quantidade).asc()).limit(10).all()
-    
+        Produto.id, Produto.nome, func.sum(Item.quantidade).label('total_vendido')
+    ).select_from(Produto).join(Item, Produto.id == Item.id_produto)\
+     .group_by(Produto.id, Produto.nome)\
+     .order_by(func.sum(Item.quantidade).asc())\
+     .limit(10).all()
+
     if not resultado:
         print("\nNenhum produto vendido encontrado.")
         return
-    
-    print("\n" + "=" * 70)
-    print("PRODUTOS MENOS VENDIDOS (Top 10)")
-    print("=" * 70)
-    print(f"{'ID':<5} {'Nome':<40} {'Total Vendido':<20}")
-    print("-" * 70)
-    
-    for produto_id, nome, total_vendido in resultado:
-        print(f"{produto_id:<5} {nome:<40} {total_vendido:<20}")
-    
-    print("=" * 70)
-    
-    produtos_nao_vendidos = session.query(Produto).outerjoin(Item, Produto.id == Item.id_produto).filter(Item.id == None).all()
-    if produtos_nao_vendidos:
-        print("\nProdutos nunca vendidos:")
-        for produto in produtos_nao_vendidos:
-            print(f"  {produto.id}. {produto.nome}")
+
+    tabela = [[pid, nome, total] for pid, nome, total in resultado]
+    print("\nTOP 10 – PRODUTOS MENOS VENDIDOS\n")
+    print(tabulate(tabela, headers=["ID", "Produto", "Total Vendido"], tablefmt="grid", stralign="left", numalign="right"))
+
+    nao_vendidos = session.query(Produto).outerjoin(Item, Produto.id == Item.id_produto)\
+        .filter(Item.id == None).all()
+    if nao_vendidos:
+        tabela_nv = [[p.id, p.nome] for p in nao_vendidos]
+        print("\nPRODUTOS NUNCA VENDIDOS:\n")
+        print(tabulate(tabela_nv, headers=["ID", "Produto"], tablefmt="simple_grid"))
+
 
 def produtos_estoque_baixo():
     try:
         limite = int(input("\nDigite o limite de estoque: ").strip())
-        
         session = obter_sessao()
         produtos = session.query(Produto).filter(Produto.quantidade <= limite).order_by(Produto.quantidade.asc()).all()
-        
+
         if not produtos:
             print(f"\nNenhum produto com estoque <= {limite}.")
             return
-        
-        print("\n" + "=" * 70)
-        print(f"PRODUTOS COM ESTOQUE BAIXO (<= {limite})")
-        print("=" * 70)
-        print(f"{'ID':<5} {'Nome':<40} {'Estoque':<15}")
-        print("-" * 70)
-        
-        for produto in produtos:
-            print(f"{produto.id:<5} {produto.nome:<40} {produto.quantidade:<15}")
-        
-        print("=" * 70)
-        print(f"Total: {len(produtos)} produto(s)")
-        
+
+        tabela = [[p.id, p.nome, p.quantidade] for p in produtos]
+        print(f"\nPRODUTOS COM ESTOQUE BAIXO (<= {limite})\n")
+        print(tabulate(tabela, headers=["ID", "Produto", "Estoque"], tablefmt="fancy_grid", stralign="left", numalign="right"))
+        print(f"\nTotal: {len(produtos)} produto(s)")
+
     except ValueError:
         print("Limite inválido. Digite um número.")
+
 
 def fornecedores_produto():
     try:
         id_produto = int(input("\nDigite o ID do produto: ").strip())
         produto = obter_produto_por_id(id_produto)
-        
         if not produto:
             print(f"Produto {id_produto} não encontrado.")
             return
-        
+
         fornecedores = obter_fornecedores_produto(id_produto)
-        
-        print("\n" + "=" * 70)
-        print(f"FORNECEDORES DO PRODUTO: {produto.nome} (ID: {id_produto})")
-        print("=" * 70)
-        
+        print(f"\nFORNECEDORES DO PRODUTO: {produto.nome} (ID {id_produto})\n")
+
         if fornecedores:
-            print(f"{'ID':<5} {'Nome':<65}")
-            print("-" * 70)
-            for fornecedor in fornecedores:
-                print(f"{fornecedor.id:<5} {fornecedor.nome:<65}")
+            tabela = [[f.id, f.nome] for f in fornecedores]
+            print(tabulate(tabela, headers=["ID", "Fornecedor"], tablefmt="grid", stralign="left"))
         else:
-            print("Nenhum fornecedor associado a este produto.")
-        
-        print("=" * 70)
+            print("Nenhum fornecedor associado.")
         
     except ValueError:
         print("ID inválido.")

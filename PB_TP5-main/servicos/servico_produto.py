@@ -2,6 +2,7 @@ import pandas as pd
 from dados.repositorio_produto import salvar_ou_atualizar_produto
 from dados.modelos import Produto
 from utilidades.arquivos import caminho_produtos_csv
+from tabulate import tabulate
 
 def importar_produtos_csv_para_bd():
     import os
@@ -17,7 +18,7 @@ def importar_produtos_csv_para_bd():
         if df.empty:
             print("AVISO: O arquivo CSV está vazio. Nenhum produto para importar.")
             return
-        print(f"CSV lido com sucesso: {len(df)} linhas encontradas")
+        print(f"CSV lido com sucesso: {len(df)} linhas encontradas\n")
     except Exception as ex:
         print(f"Erro ao ler CSV de produtos: {ex}")
         return
@@ -84,29 +85,50 @@ def importar_produtos_csv_para_bd():
         else:
             produtos_importados += 1
 
-    print("Importação de produtos concluída:")
-    print(f"  - {produtos_importados} produtos novos importados")
-    print(f"  - {produtos_atualizados} produtos atualizados")
-    print(f"  - {produtos_ignorados} produtos ignorados (não foram salvos no banco)")
+
+    resumo_tabela = [
+        ["Produtos novos importados", produtos_importados],
+        ["Produtos atualizados", produtos_atualizados],
+        ["Produtos ignorados", produtos_ignorados],
+    ]
+
+    print("\nIMPORTAÇÃO DE PRODUTOS CONCLUÍDA:\n")
+    print(tabulate(
+        resumo_tabela,
+        headers=["Descrição", "Quantidade"],
+        tablefmt="fancy_grid",
+        stralign="left",
+        numalign="right"
+    ))
 
     from dados.repositorio_produto import contar_produtos, listar_todos_produtos
     total_produtos = contar_produtos()
     produtos_validos = produtos_importados + produtos_atualizados
     produtos_no_csv = len(df)
 
-    print(f"  - Total de produtos válidos no banco: {total_produtos}")
-    print(f"  - Produtos processados nesta importação: {produtos_validos} (ignorados não são salvos)")
+    print(f"\nTotal de produtos válidos no banco: {total_produtos}")
+    print(f"Produtos processados nesta importação: {produtos_validos}")
 
     if total_produtos > produtos_no_csv:
         diferenca = total_produtos - produtos_no_csv
-        print(f"\n AVISO: O banco tem {total_produtos} produtos, mas o CSV tem apenas {produtos_no_csv}.")
-        print(f"   Há {diferenca} produto(s) antigo(s) no banco de execuções anteriores.")
+        print(f"\nAVISO: O banco possui {total_produtos} produtos, mas o CSV contém apenas {produtos_no_csv}.")
+        print(f"Há {diferenca} produto(s) antigo(s) no banco de execuções anteriores.")
 
     if total_produtos > 0:
-        print("\nAmostra dos produtos no banco (primeiros 10):")
+        print("\nAmostra dos produtos no banco (primeiros 10):\n")
         produtos = listar_todos_produtos()
-        for i, p in enumerate(produtos[:10], 1):
-            print(f"  {i}. ID: {p.id}, Nome: {p.nome}, Qtd: {p.quantidade}, Preço: R$ {p.preco:.2f}")
+
+        tabela_produtos = [
+            [p.id, p.nome, p.quantidade, f"R$ {p.preco:.2f}"]
+            for p in produtos[:10]
+        ]
+
+        print(tabulate(
+            tabela_produtos,
+            headers=["ID", "Nome", "Quantidade", "Preço"],
+            tablefmt="grid",
+            showindex=True
+        ))
 
         if total_produtos > 10:
-            print(f"  ... e mais {total_produtos - 10} produtos no banco.")
+            print(f"\n... e mais {total_produtos - 10} produtos no banco.\n")

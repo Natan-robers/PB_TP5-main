@@ -1,8 +1,12 @@
 from dados.repositorio_cliente import listar_todos_clientes, obter_cliente_por_id
-from dados.repositorio_compra import obter_compras_por_cliente, obter_itens_compra, obter_total_compra
+from dados.repositorio_compra import (
+    obter_compras_por_cliente, obter_itens_compra, obter_total_compra
+)
 from dados.conexao import obter_sessao
 from dados.modelos import Cliente, Compra
 from sqlalchemy import func
+from tabulate import tabulate
+
 
 def menu_clientes():
     while True:
@@ -30,6 +34,7 @@ def menu_clientes():
             break
         except Exception as e:
             print(f"\nErro: {e}")
+
 
 def menu_clientes_com_compras():
     while True:
@@ -61,6 +66,7 @@ def menu_clientes_com_compras():
         except Exception as e:
             print(f"\nErro: {e}")
 
+
 def consultar_compras_cliente():
     try:
         id_cliente = int(input("\nDigite o ID do cliente: ").strip())
@@ -71,24 +77,18 @@ def consultar_compras_cliente():
             return
         
         compras = obter_compras_por_cliente(id_cliente)
-        
         if not compras:
             print(f"\nCliente {cliente.nome} não possui compras registradas.")
             return
         
-        print(f"\nCompras do cliente {cliente.nome} (ID: {id_cliente}):")
-        print("-" * 70)
-        print(f"{'ID':<5} {'Data/Hora':<20} {'Total':<15}")
-        print("-" * 70)
-        
-        for compra in compras:
-            total = obter_total_compra(compra.id)
-            data_str = compra.data_hora.strftime("%d/%m/%Y %H:%M:%S")
-            print(f"{compra.id:<5} {data_str:<20} R$ {total:>10.2f}")
-        
-        print("\n" + "-" * 70)
-        id_compra = input("Digite o ID da compra para ver detalhes (ou Enter para voltar): ").strip()
-        
+        tabela = [
+            [c.id, c.data_hora.strftime("%d/%m/%Y %H:%M:%S"), f"R$ {obter_total_compra(c.id):.2f}"]
+            for c in compras
+        ]
+        print(f"\nCompras do cliente {cliente.nome} (ID: {id_cliente}):\n")
+        print(tabulate(tabela, headers=["ID", "Data/Hora", "Total"], tablefmt="fancy_grid", stralign="left", numalign="right"))
+
+        id_compra = input("\nDigite o ID da compra para ver detalhes (ou Enter para voltar): ").strip()
         if id_compra:
             try:
                 exibir_nota_fiscal_compra(int(id_compra))
@@ -98,6 +98,7 @@ def consultar_compras_cliente():
         print("ID inválido. Digite um número.")
     except Exception as e:
         print(f"Erro: {e}")
+
 
 def exibir_nota_fiscal_compra(id_compra):
     from dados.repositorio_compra import obter_compra_por_id
@@ -109,23 +110,19 @@ def exibir_nota_fiscal_compra(id_compra):
     
     itens = obter_itens_compra(id_compra)
     total = obter_total_compra(id_compra)
+
+    tabela = [
+        [item.produto.nome, item.quantidade, f"R$ {item.preco:.2f}", f"R$ {item.total:.2f}"]
+        for item in itens
+    ]
     
-    print("\n" + "=" * 70)
-    print("NOTA FISCAL")
-    print("=" * 70)
+    print("\nNOTA FISCAL\n")
     print(f"Cliente: {compra.cliente.nome} (ID: {compra.cliente.id})")
     print(f"Compra ID: {id_compra}")
-    print(f"Data/Hora: {compra.data_hora.strftime('%d/%m/%Y %H:%M:%S')}")
-    print("-" * 70)
-    print(f"{'Produto':<30} {'Qtd':<10} {'Preço Unit.':<15} {'Total':<15}")
-    print("-" * 70)
-    
-    for item in itens:
-        print(f"{item.produto.nome:<30} {item.quantidade:<10} R$ {item.preco:>10.2f} R$ {item.total:>10.2f}")
-    
-    print("-" * 70)
-    print(f"{'TOTAL':<55} R$ {total:>10.2f}")
-    print("=" * 70)
+    print(f"Data/Hora: {compra.data_hora.strftime('%d/%m/%Y %H:%M:%S')}\n")
+    print(tabulate(tabela, headers=["Produto", "Qtd", "Preço Unit.", "Total"], tablefmt="fancy_grid", stralign="left", numalign="right"))
+    print(f"\nTOTAL: R$ {total:.2f}")
+
 
 def clientes_que_mais_compram():
     session = obter_sessao()
@@ -134,22 +131,18 @@ def clientes_que_mais_compram():
         Cliente.id,
         Cliente.nome,
         func.count(Compra.id).label('total_compras')
-    ).select_from(Cliente).join(Compra, Cliente.id == Compra.id_cliente).group_by(Cliente.id, Cliente.nome).order_by(func.count(Compra.id).desc()).all()
+    ).select_from(Cliente).join(Compra, Cliente.id == Compra.id_cliente)\
+     .group_by(Cliente.id, Cliente.nome)\
+     .order_by(func.count(Compra.id).desc()).all()
     
     if not resultado:
         print("\nNenhum cliente com compras encontrado.")
         return
     
-    print("\n" + "=" * 70)
-    print("CLIENTES QUE MAIS COMPRAM")
-    print("=" * 70)
-    print(f"{'ID':<5} {'Nome':<40} {'Total de Compras':<20}")
-    print("-" * 70)
-    
-    for cliente_id, nome, total_compras in resultado:
-        print(f"{cliente_id:<5} {nome:<40} {total_compras:<20}")
-    
-    print("=" * 70)
+    tabela = [[cid, nome, total] for cid, nome, total in resultado]
+    print("\nCLIENTES QUE MAIS COMPRAM\n")
+    print(tabulate(tabela, headers=["ID", "Nome", "Total de Compras"], tablefmt="fancy_grid", stralign="left", numalign="right"))
+
 
 def clientes_que_mais_gastam():
     session = obter_sessao()
@@ -159,22 +152,18 @@ def clientes_que_mais_gastam():
         Cliente.id,
         Cliente.nome,
         func.sum(Item.quantidade * Item.preco).label('total_gasto')
-    ).select_from(Cliente).join(Compra, Cliente.id == Compra.id_cliente).join(Item, Compra.id == Item.id_compra).group_by(Cliente.id, Cliente.nome).order_by(func.sum(Item.quantidade * Item.preco).desc()).all()
+    ).select_from(Cliente).join(Compra, Cliente.id == Compra.id_cliente).join(Item, Compra.id == Item.id_compra)\
+     .group_by(Cliente.id, Cliente.nome)\
+     .order_by(func.sum(Item.quantidade * Item.preco).desc()).all()
     
     if not resultado:
         print("\nNenhum cliente com compras encontrado.")
         return
     
-    print("\n" + "=" * 70)
-    print("CLIENTES QUE MAIS GASTAM")
-    print("=" * 70)
-    print(f"{'ID':<5} {'Nome':<40} {'Total Gasto':<20}")
-    print("-" * 70)
-    
-    for cliente_id, nome, total_gasto in resultado:
-        print(f"{cliente_id:<5} {nome:<40} R$ {total_gasto:>15.2f}")
-    
-    print("=" * 70)
+    tabela = [[cid, nome, f"R$ {total:.2f}"] for cid, nome, total in resultado]
+    print("\nCLIENTES QUE MAIS GASTAM\n")
+    print(tabulate(tabela, headers=["ID", "Nome", "Total Gasto"], tablefmt="fancy_grid", stralign="left", numalign="right"))
+
 
 def listar_clientes_sem_compras():
     session = obter_sessao()
@@ -184,14 +173,8 @@ def listar_clientes_sem_compras():
         print("\nTodos os clientes possuem pelo menos uma compra.")
         return
     
-    print("\n" + "=" * 70)
-    print("CLIENTES SEM COMPRAS")
-    print("=" * 70)
-    print(f"{'ID':<5} {'Nome':<65}")
-    print("-" * 70)
-    
-    for cliente in clientes_sem_compras:
-        print(f"{cliente.id:<5} {cliente.nome:<65}")
-    
-    print("=" * 70)
-    print(f"Total: {len(clientes_sem_compras)} cliente(s) sem compras.")
+    tabela = [[c.id, c.nome] for c in clientes_sem_compras]
+    print("\nCLIENTES SEM COMPRAS\n")
+    print(tabulate(tabela, headers=["ID", "Nome"], tablefmt="fancy_grid", stralign="left"))
+    print(f"\nTotal: {len(clientes_sem_compras)} cliente(s) sem compras.")
+
