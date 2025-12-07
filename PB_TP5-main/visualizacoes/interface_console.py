@@ -16,7 +16,6 @@ def solicitar_id_produto():
     if raw.lower() == 'fim':
         return None
     
-    
     try:
         pid = int(raw)
     except ValueError:
@@ -38,10 +37,11 @@ def solicitar_quantidade(produto, estoque_temp):
 
     estoque_atual = estoque_temp[produto.id]
 
-    q = input(
-        f"Quantidade para {produto.nome} "
-        f"(disponível {estoque_atual}): "
-    ).strip()
+    if estoque_atual == 0:
+        print(f" Produto '{produto.nome}' está sem estoque!")
+        return 0 
+
+    q = input(f"Quantidade para {produto.nome} (disponível {estoque_atual}): ").strip()
 
     try:
         qn = int(q)
@@ -54,35 +54,28 @@ def solicitar_quantidade(produto, estoque_temp):
         return solicitar_quantidade(produto, estoque_temp)
 
     estoque_temp[produto.id] -= qn
-
     return qn
 
 
-
 def solicitar_id_produto_e_quantidade(estoque_temp):
-    raw = input("Digite id do produto (ou 'fim' para encerrar): ").strip()
-    if raw.lower() == 'fim':
-        return None
+    while True:  
+        produto = solicitar_id_produto()
+        if produto is None:
+            return None  
 
-    try:
-        pid = int(raw)
-    except ValueError:
-        print("ID inválido.")
-        return solicitar_id_produto_e_quantidade(estoque_temp)
+        quantidade = solicitar_quantidade(produto, estoque_temp)
 
-    produto = obter_produto_por_id(pid)
-    if not produto:
-        print("Produto não encontrado.")
-        return solicitar_id_produto_e_quantidade(estoque_temp)
+        if quantidade == 0:
+            continue  
 
-    quantidade = solicitar_quantidade(produto, estoque_temp)
+        return {
+            'id': produto.id,
+            'nome': produto.nome,
+            'quantidade': quantidade,
+            'preco': produto.preco
+        }
 
-    return {
-        'id': produto.id,
-        'nome': produto.nome,
-        'quantidade': quantidade,
-        'preco': produto.preco
-    }
+
 
 
 
